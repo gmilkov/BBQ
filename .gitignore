@@ -50,7 +50,6 @@ artifacts/
 *.meta
 *.obj
 *.pch
-*.pdb
 *.pgc
 *.pgd
 *.rsp
@@ -250,8 +249,3 @@ paket-files/
 *.tlog
 *.tlog
 *.idb
-*.pdb
-*.exe
-*.pdb
-*.exe
-*.pdb
