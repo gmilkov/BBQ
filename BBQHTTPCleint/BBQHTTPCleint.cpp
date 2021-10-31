@@ -64,7 +64,8 @@ BBQ::ServerResponse sendCommand(string command, HTTPClientSession& session, Poco
 		}
 		else
 		{
-			return BBQ::ServerResponse::OkWait;
+			cout << "Error: " << response.getStatus() << endl;
+			return BBQ::ServerResponse::Closed;
 		}
 	}
 	catch (Poco::Exception& exc) {
@@ -74,20 +75,30 @@ BBQ::ServerResponse sendCommand(string command, HTTPClientSession& session, Poco
 }
 
 
-int main(std::vector<std::string>& args)
+int main(int argc, char** argv)
 {
-	URI uri(args[0]);
+	if (argc < 2) return EXIT_FAILURE;
+	bool useProxy = false;
+	if (argc == 4) { useProxy = true; }
 
-	Poco::Net::HTTPClientSession::ProxyConfig proxy;
-
-	proxy.host = args[1];
-	proxy.port = stoi(args[2]);
-	proxy.authMethod = Poco::Net::HTTPClientSession::ProxyAuthentication::PROXY_AUTH_NONE;
+	URI uri(argv[1]);
 
 	std::string path(uri.getPathAndQuery());
 	if (path.empty()) path = "/";
 
-	HTTPClientSession session(uri.getHost(), uri.getPort(), proxy);
+	HTTPClientSession session(uri.getHost(), uri.getPort());
+
+	if (useProxy)
+	{
+		Poco::Net::HTTPClientSession::ProxyConfig proxy;
+
+		proxy.host = argv[2];
+		proxy.port = stoi(argv[3]);
+		proxy.authMethod = Poco::Net::HTTPClientSession::ProxyAuthentication::PROXY_AUTH_NONE;
+
+		session.setProxyConfig(proxy);
+	};
+
 
 	string command = BBQ::clientCmdToStr(BBQ::ClientCommand::I_AM_HUNGRY_GIVE_ME_BBQ);
 
