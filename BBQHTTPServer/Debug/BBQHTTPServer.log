@@ -1,0 +1,5 @@
+﻿  BBQHTTPServer.cpp
+C:\Repos\BBQ\BBQProtocol\BBQ.h(63): warning C4715: 'BBQ::clientStateToStr': not all control paths return a value
+C:\Repos\BBQ\BBQProtocol\BBQ.h(98): warning C4715: 'BBQ::menuItemToStr': not all control paths return a value
+C:\Repos\BBQ\BBQHTTPServer\BBQHTTPServer.cpp(133): warning C4715: 'BBQRequestHandler::push_order_ready': not all control paths return a value
+  BBQHTTPServer.vcxproj -> C:\Repos\BBQ\Debug\BBQHTTPServer.exe

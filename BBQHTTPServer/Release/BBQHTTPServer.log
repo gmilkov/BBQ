@@ -1,0 +1,9 @@
+﻿  BBQHTTPServer.cpp
+  Generating code
+C:\Repos\BBQ\BBQHTTPServer\BBQHTTPServer.cpp(133): warning C4715: 'BBQRequestHandler::push_order_ready': not all control paths return a value
+C:\Repos\BBQ\BBQProtocol\BBQ.h(63): warning C4715: 'BBQ::clientStateToStr': not all control paths return a value
+C:\Repos\BBQ\BBQProtocol\BBQ.h(98): warning C4715: 'BBQ::menuItemToStr': not all control paths return a value
+  Finished generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 216 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  BBQHTTPServer.vcxproj -> C:\Repos\BBQ\Release\BBQHTTPServer.exe
