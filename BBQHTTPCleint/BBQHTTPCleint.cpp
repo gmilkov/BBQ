@@ -76,12 +76,18 @@ BBQ::ServerResponse sendCommand(string command, HTTPClientSession& session, Poco
 
 int main(std::vector<std::string>& args)
 {
-	URI uri("http://localhost:80");
+	URI uri(args[0]);
+
+	Poco::Net::HTTPClientSession::ProxyConfig proxy;
+
+	proxy.host = args[1];
+	proxy.port = stoi(args[2]);
+	proxy.authMethod = Poco::Net::HTTPClientSession::ProxyAuthentication::PROXY_AUTH_NONE;
 
 	std::string path(uri.getPathAndQuery());
 	if (path.empty()) path = "/";
 
-	HTTPClientSession session(uri.getHost(), uri.getPort());
+	HTTPClientSession session(uri.getHost(), uri.getPort(), proxy);
 
 	string command = BBQ::clientCmdToStr(BBQ::ClientCommand::I_AM_HUNGRY_GIVE_ME_BBQ);
 
