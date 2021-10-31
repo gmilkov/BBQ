@@ -9,50 +9,108 @@
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/URI.h>
 #include <Poco/StreamCopier.h>
+#include "../BBQProtocol/BBQ.h"
+#include <Poco/Util/ServerApplication.h>
+
+using namespace Poco::Util;
 using namespace std;
 using namespace Poco;
 using namespace Poco::Net;
 
-void sendCommand(string command, HTTPClientSession& session, string& result) {
-    HTTPRequest request(HTTPRequest::HTTP_POST, "/", HTTPMessage::HTTP_1_1);
+Poco::Net::NameValueCollection getCookies(vector<Poco::Net::HTTPCookie>& cookies) {
+	Poco::Net::NameValueCollection nvc;
+	std::vector<Poco::Net::HTTPCookie>::const_iterator it = cookies.begin();
+	while (it != cookies.end()) {
+		nvc.add((*it).getName(), (*it).getValue());
+		++it;
+	}
+	return nvc;
+}
 
-    request.setContentLength(command.length());
+BBQ::ServerResponse sendCommand(string command, HTTPClientSession& session, Poco::Net::NameValueCollection& cookies) {
+	HTTPRequest request(HTTPRequest::HTTP_POST, "/", HTTPMessage::HTTP_1_1);
 
-    ostream& os = session.sendRequest(request);
-    os << command;
+	request.setContentLength(command.length());
 
-    HTTPResponse response;
-    std::istream& rs = session.receiveResponse(response);
+	request.setCookies(cookies);
 
-    if (response.getStatus() == HTTPResponse::HTTP_OK)
-    {
-        std::cout << response.getStatus() << " " << response.getReason() << std::endl;
+	ostream& os = session.sendRequest(request);
+	os << command;
 
-        string encoded_content(std::istreambuf_iterator<char>(rs), {});
+	try {
+		HTTPResponse response;
+		std::istream& rs = session.receiveResponse(response);
 
-        Poco::URI::decode(encoded_content, result);
-    } 
-    else
-    {
-        cout << response.getStatus();
-    }
+		if (response.getStatus() == HTTPResponse::HTTP_OK)
+		{
+			vector<Poco::Net::HTTPCookie> newCookies;
+			response.getCookies(newCookies);
+			if (!newCookies.empty()) {
+				cookies = getCookies(newCookies);
+			}
+
+			std::cout << response.getStatus() << " " << response.getReason() << std::endl;
+
+			string encoded_content(std::istreambuf_iterator<char>(rs), {});
+
+			string result;
+			Poco::URI::decode(encoded_content, result);
+
+			BBQ::ServerResponse resp = BBQ::strToSrvResp(result);
+
+			return resp;
+		}
+		else
+		{
+			return BBQ::ServerResponse::OkWait;
+		}
+	}
+	catch (Poco::Exception& exc) {
+		cout << exc.displayText();
+		return BBQ::ServerResponse::OkWait;
+	}
 }
 
 
-int main(std::vector<std::string> &args)
+int main(std::vector<std::string>& args)
 {
-    URI uri("http://localhost:80");
+	URI uri("http://localhost:80");
 
-    std::string path(uri.getPathAndQuery());
-    if (path.empty()) path = "/";
+	std::string path(uri.getPathAndQuery());
+	if (path.empty()) path = "/";
 
-    HTTPClientSession session(uri.getHost(), uri.getPort());
+	HTTPClientSession session(uri.getHost(), uri.getPort());
 
-    string result;
+	string command = BBQ::clientCmdToStr(BBQ::ClientCommand::I_AM_HUNGRY_GIVE_ME_BBQ);
 
-    sendCommand("I AM HUNGRY, GIVE ME BBQ", session, result);
+	try {
 
-    cout << result;
+		Poco::Net::NameValueCollection cookies;
+		
+		BBQ::ServerResponse response = sendCommand(command, session, cookies);
+		
+		cout << BBQ::srvRespToStr(response);
+
+		while (response == BBQ::ServerResponse::OkWait) {
+			response = sendCommand(command, session, cookies);
+			cout << BBQ::srvRespToStr(response);
+		}
+
+		if (response == BBQ::ServerResponse::BeefReady || response == BBQ::ServerResponse::ChickenReady)
+		{
+			command = BBQ::clientCmdToStr(BBQ::ClientCommand::I_TAKE_THAT);
+		}
+		else if (response == BBQ::ServerResponse::MammothReady)
+		{
+			command = BBQ::clientCmdToStr(BBQ::ClientCommand::NO_THANKS);
+		}
+
+		response = sendCommand(command, session, cookies);
+		cout << BBQ::srvRespToStr(response);
+	}
+	catch (Poco::Exception& exc) {
+		cout << exc.displayText();
+	}
 }
 
 

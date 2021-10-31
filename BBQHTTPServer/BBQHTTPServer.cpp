@@ -18,10 +18,10 @@
 #include "Poco/URI.h"
 #include "Poco/UUID.h"
 #include "Poco/UUIDGenerator.h"
-#include <iostream>
-#include <chrono>
-#include <thread>
-#include <combaseapi.h>
+#include "iostream"
+#include "chrono"
+#include "thread"
+#include "combaseapi.h"
 #include "../BBQProtocol/BBQ.h"
 
 using Poco::Net::ServerSocket;
@@ -40,11 +40,11 @@ using Poco::ThreadPool;
 using Poco::URI;
 using Poco::UUID;
 
-using namespace Poco;
-using namespace Poco::Net;
 using namespace std;
 using namespace std::chrono;
 using namespace std::this_thread;
+using namespace Poco;
+using namespace Poco::Net;
 
 
 class BBQRequestHandler : public HTTPRequestHandler {
@@ -52,20 +52,20 @@ class BBQRequestHandler : public HTTPRequestHandler {
 public:
 	void handleRequest(HTTPServerRequest& request, HTTPServerResponse& response)
 	{
-		logRequest(request);
-
 		BBQ::Client client = initBBQClient(request);
 
-		processRequest(request, client);
+		string command = getRequestCommand(request);
+
+		logRequest(request, command);
+
+		processRequest(request, client, command);
 
 		sendResponse(response, client);
 	}
 
-	void processRequest(HTTPServerRequest& request, BBQ::Client& client)
+	void processRequest(HTTPServerRequest& request, BBQ::Client& client, string command)
 	{
-		string command = getRequestCommand(request);
-
-		switch (BBQ::parse_cmd(command)) 
+		switch (BBQ::strToClientCmd(command)) 
 		{
 			case BBQ::ClientCommand::I_AM_HUNGRY_GIVE_ME_BBQ:
 				if (client.State == BBQ::ClientState::New)
@@ -102,46 +102,36 @@ public:
 		switch (client.State)
 		{
 			case BBQ::ClientState::Waiting:
-				command = "OK, WAIT";
+				command = BBQ::srvRespToStr(BBQ::ServerResponse::OkWait);
 				break;
 			case BBQ::ClientState::Ready:
-				command = push_order_ready(client.Order);
+				command = BBQ::pushCmdFromOrder(client.Order);
 				break;
 			case BBQ::ClientState::Served:
-				command = "SERVED BYE";
+				command = BBQ::srvRespToStr(BBQ::ServerResponse::Served);
 				break;
 			case BBQ::ClientState::Closed:
-				command = "CLOSED BUY";
+				command = BBQ::srvRespToStr(BBQ::ServerResponse::Closed);
 		}
 
 		ostr << command;
+
+		logResponse(response, command);
 	}
 
 	void waitForOrder()
 	{
-		sleep_for(seconds(15));
+		sleep_for(seconds(1));
 	}
 
-	string push_order_ready(BBQ::MenuItem order)
-	{
-		switch (order)
-		{
-			case BBQ::MenuItem::Chicken:	return "CHICKEN READY"; break;
-			case BBQ::MenuItem::Beef:		return "BEEF READY";	break;
-			case BBQ::MenuItem::Mammoth:	return "LAST MONTH MAMMOTH READY"; break;
-		}
-	}
-
-
-	BBQ::MenuItem getRandomMeal()
-	{
-		return (BBQ::MenuItem)(rand() % 3);
-	}
-
-	void logRequest(HTTPServerRequest& request) {
+	void logResponse(HTTPServerResponse& response, string command) {
 		Application& app = Application::instance();
 
-		string command = getRequestCommand(request);
+		app.logger().information("Response: " + command);
+	}
+
+	void logRequest(HTTPServerRequest& request, string command) {
+		Application& app = Application::instance();
 
 		app.logger().information("Request from " + request.clientAddress().toString());
 		app.logger().information("Command: " + command);
@@ -150,9 +140,9 @@ public:
 	string getRequestCommand(Poco::Net::HTTPServerRequest& request)
 	{
 		size_t size = (size_t)request.getContentLength();
-		std::istream& stream = request.stream();
-		std::string encoded_content;
-		std::string content;
+		istream& stream = request.stream();
+		string encoded_content;
+		string content;
 		encoded_content.resize(size);
 		stream.read(&encoded_content[0], size);
 		Poco::URI::decode(encoded_content, content);
@@ -182,6 +172,11 @@ public:
 		}
 
 		return BBQ::Client(sessionId, clientOrder, clientState);
+	}
+	
+	BBQ::MenuItem getRandomMeal()
+	{
+		return (BBQ::MenuItem)(rand() % 3);
 	}
 };
 
@@ -288,6 +283,7 @@ protected:
 private:
 	bool _helpRequested;
 };
+
 
 int main(int argc, char** argv)
 {
