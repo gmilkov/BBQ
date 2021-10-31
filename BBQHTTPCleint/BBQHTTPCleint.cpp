@@ -37,6 +37,8 @@ BBQ::ServerResponse sendCommand(string command, HTTPClientSession& session, Poco
 	ostream& os = session.sendRequest(request);
 	os << command;
 
+	cout << "Sent:" << command << endl;
+
 	try {
 		HTTPResponse response;
 		std::istream& rs = session.receiveResponse(response);
@@ -49,12 +51,12 @@ BBQ::ServerResponse sendCommand(string command, HTTPClientSession& session, Poco
 				cookies = getCookies(newCookies);
 			}
 
-			std::cout << response.getStatus() << " " << response.getReason() << std::endl;
-
 			string encoded_content(std::istreambuf_iterator<char>(rs), {});
 
 			string result;
 			Poco::URI::decode(encoded_content, result);
+
+			cout << "Recieced: " << result << endl;
 
 			BBQ::ServerResponse resp = BBQ::strToSrvResp(result);
 
@@ -89,11 +91,8 @@ int main(std::vector<std::string>& args)
 		
 		BBQ::ServerResponse response = sendCommand(command, session, cookies);
 		
-		cout << BBQ::srvRespToStr(response);
-
 		while (response == BBQ::ServerResponse::OkWait) {
 			response = sendCommand(command, session, cookies);
-			cout << BBQ::srvRespToStr(response);
 		}
 
 		if (response == BBQ::ServerResponse::BeefReady || response == BBQ::ServerResponse::ChickenReady)
@@ -106,11 +105,13 @@ int main(std::vector<std::string>& args)
 		}
 
 		response = sendCommand(command, session, cookies);
-		cout << BBQ::srvRespToStr(response);
 	}
 	catch (Poco::Exception& exc) {
-		cout << exc.displayText();
+		cout << "Error: " << exc.displayText();
 	}
+
+	cout << endl << "-- Press [Enter] to exit --" << endl;
+	cin.get();
 }
 
 

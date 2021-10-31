@@ -176,6 +176,7 @@ public:
 	
 	BBQ::MenuItem getRandomMeal()
 	{
+		srand(std::time(nullptr));
 		return (BBQ::MenuItem)(rand() % 3);
 	}
 };
