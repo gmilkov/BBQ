@@ -50,6 +50,15 @@ using namespace Poco::Net;
 class BBQRequestHandler : public HTTPRequestHandler {
 
 public:
+
+	BBQRequestHandler(int pWaitTimeForMeal)
+	{
+		waitTimeForMeal = pWaitTimeForMeal;
+	};
+
+private:
+	int waitTimeForMeal;
+
 	void handleRequest(HTTPServerRequest& request, HTTPServerResponse& response)
 	{
 		BBQ::Client client = initBBQClient(request);
@@ -74,7 +83,7 @@ public:
 				}
 				else if (client.State == BBQ::ClientState::Waiting)
 				{
-					waitForOrder();
+					waitForOrder(); //simulating waiting for order to get ready
 					client.State = BBQ::ClientState::Ready;
 				}
 				break;
@@ -119,9 +128,10 @@ public:
 		logResponse(response, command);
 	}
 
-	void waitForOrder()
+	void waitForOrder() //simulating waiting for order to get ready
 	{
-		sleep_for(seconds(1));
+		srand(std::time(nullptr));
+		sleep_for(seconds(rand() % waitTimeForMeal));
 	}
 
 	void logResponse(HTTPServerResponse& response, string command) {
@@ -185,15 +195,23 @@ public:
 class BBQRequestHandlerFactory : public HTTPRequestHandlerFactory
 {
 public:
+	BBQRequestHandlerFactory(int waitTime)
+	{
+		waitTimeForMeal = waitTime;
+	}
+
 	HTTPRequestHandler* createRequestHandler(const HTTPServerRequest& request)
 	{
 		if (request.getURI() == "/")
 		{
-			return new BBQRequestHandler();
+			return new BBQRequestHandler(waitTimeForMeal);
 		}
 		else
 			return 0;
 	}
+
+private:
+	int waitTimeForMeal;
 };
 
 
@@ -237,6 +255,15 @@ protected:
 			.repeatable(false)
 			.argument("value")
 			.binding("Port"));
+
+		options.addOption(
+			Option()
+			.fullName("wait-time")
+			.description("Maximal time to wait for meal to get ready. Default value is 1 sec")
+			.required(false)
+			.repeatable(false)
+			.argument("value")
+			.binding("WaitTime"));
 	}
 
 	void handleOption(const std::string& name, const std::string& value)
@@ -265,9 +292,16 @@ protected:
 		else
 		{
 			int port = 80;
+			int waitTimeForMeal = 1;
+
 			if (config().hasProperty("Port")) {
 				port = stoi(config().getString("Port"));
 			};
+
+			if (config().hasProperty("WaitTime")) {
+				waitTimeForMeal = stoi(config().getString("WaitTime"));
+			};
+
 
 			int maxQueued = 1;
 			int maxThreads = 16;
@@ -280,7 +314,7 @@ protected:
 			// set-up a server socket
 			ServerSocket svs(port);
 			// set-up a HTTPServer instance
-			HTTPServer srv(new BBQRequestHandlerFactory(), svs, pParams);
+			HTTPServer srv(new BBQRequestHandlerFactory(waitTimeForMeal), svs, pParams);
 			// start the HTTPServer
 			srv.start();
 
