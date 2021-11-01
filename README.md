@@ -5,4 +5,4 @@ Use "vcpkg install POCO" to get POCO++
 
 for help on usage run:
 
-"BBQHTTPCleint.exe /help" or "BBQHTTPServer.exe /help" respectivly
+"BBQHTTPCleint.exe /help" or "BBQHTTPServer.exe /help" respectively
