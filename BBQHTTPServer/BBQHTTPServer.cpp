@@ -70,7 +70,7 @@ private:
 		processRequest(request, client, command);
 
 		sendResponse(response, client);
-	}
+	};
 
 	void processRequest(HTTPServerRequest& request, BBQ::Client& client, string command)
 	{
@@ -212,6 +212,7 @@ public:
 
 private:
 	int waitTimeForMeal;
+
 };
 
 
@@ -227,6 +228,7 @@ public:
 	}
 
 protected:
+
 	void initialize(Application& self)
 	{
 		loadConfiguration(); // load default configuration files, if present
