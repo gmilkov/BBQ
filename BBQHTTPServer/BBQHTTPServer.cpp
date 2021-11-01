@@ -228,6 +228,15 @@ protected:
 			Option("help", "h", "display help information on command line arguments")
 			.required(false)
 			.repeatable(false));
+
+		options.addOption(
+			Option()
+			.fullName("port")
+			.description("default value 80")
+			.required(false)
+			.repeatable(false)
+			.argument("value")
+			.binding("Port"));
 	}
 
 	void handleOption(const std::string& name, const std::string& value)
@@ -243,7 +252,7 @@ protected:
 		HelpFormatter helpFormatter(options());
 		helpFormatter.setCommand(commandName());
 		helpFormatter.setUsage("OPTIONS");
-		helpFormatter.setHeader("A web server that serves BBQ meals.");
+		helpFormatter.setHeader("A BBQ server over HTTP.");
 		helpFormatter.format(std::cout);
 	}
 
@@ -255,7 +264,11 @@ protected:
 		}
 		else
 		{
-			unsigned short port = 80;
+			int port = 80;
+			if (config().hasProperty("Port")) {
+				port = stoi(config().getString("Port"));
+			};
+
 			int maxQueued = 1;
 			int maxThreads = 16;
 			ThreadPool::defaultPool().addCapacity(maxThreads);
@@ -271,7 +284,7 @@ protected:
 			// start the HTTPServer
 			srv.start();
 
-			cout << "BBQ server started on port: " << srv.port() << endl;
+			logger().information("BBQ server started on port: " + to_string(srv.port()));
 
 			// wait for CTRL-C or kill
 			waitForTerminationRequest();
@@ -291,14 +304,3 @@ int main(int argc, char** argv)
 	HTTPBBQServer app;
 	app.run(argc, argv);
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file

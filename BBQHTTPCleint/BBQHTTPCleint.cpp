@@ -1,8 +1,14 @@
-// BBQHTTPCleint.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
+#include "Poco/Util/Application.h"
+#include "Poco/Util/Option.h"
+#include "Poco/Util/OptionSet.h"
+#include "Poco/Util/HelpFormatter.h"
+#include "Poco/Util/AbstractConfiguration.h"
+#include "Poco/AutoPtr.h"
 #include <iostream>
+#include <string>
 #include <vector>
+#include <sstream>
+#include <Poco/URI.h>
 #include <Poco/Net/HTTPClientSession.h>
 #include <Poco/Net/HTTPMessage.h>
 #include <Poco/Net/HTTPRequest.h>
@@ -12,134 +18,285 @@
 #include "../BBQProtocol/BBQ.h"
 #include <Poco/Util/ServerApplication.h>
 
-using namespace Poco::Util;
+
 using namespace std;
 using namespace Poco;
 using namespace Poco::Net;
+using namespace Poco::Util;
 
-Poco::Net::NameValueCollection getCookies(vector<Poco::Net::HTTPCookie>& cookies) {
-	Poco::Net::NameValueCollection nvc;
-	std::vector<Poco::Net::HTTPCookie>::const_iterator it = cookies.begin();
-	while (it != cookies.end()) {
-		nvc.add((*it).getName(), (*it).getValue());
-		++it;
+using Poco::Util::Application;
+using Poco::Util::Option;
+using Poco::Util::OptionSet;
+using Poco::Util::HelpFormatter;
+using Poco::Util::AbstractConfiguration;
+using Poco::Util::OptionCallback;
+using Poco::AutoPtr;
+
+
+class BBQHTTPClientApp : public Application
+	/// This sample demonstrates some of the features of the Util::Application class,
+	/// such as configuration file handling and command line arguments processing.
+	///
+	/// Try SampleApp --help (on Unix platforms) or SampleApp /help (elsewhere) for
+	/// more information.
+{
+public:
+	BBQHTTPClientApp() : _helpRequested(false)
+	{
 	}
-	return nvc;
-}
 
-BBQ::ServerResponse sendCommand(string command, HTTPClientSession& session, Poco::Net::NameValueCollection& cookies) {
-	HTTPRequest request(HTTPRequest::HTTP_POST, "/", HTTPMessage::HTTP_1_1);
+protected:
+	void initialize(Application& self)
+	{
+		loadConfiguration(); // load default configuration files, if present
+		Application::initialize(self);
+		// add your own initialization code here
+	}
 
-	request.setContentLength(command.length());
+	void uninitialize()
+	{
+		// add your own uninitialization code here
+		Application::uninitialize();
+	}
 
-	request.setCookies(cookies);
+	void reinitialize(Application& self)
+	{
+		Application::reinitialize(self);
+		// add your own reinitialization code here
+	}
 
-	ostream& os = session.sendRequest(request);
-	os << command;
+	void defineOptions(OptionSet& options)
+	{
+		Application::defineOptions(options);
 
-	cout << "Sent:" << command << endl;
+		options.addOption(
+			Option("help", "h", "display help information on command line arguments")
+			.required(false)
+			.repeatable(false)
+			.callback(OptionCallback<BBQHTTPClientApp>(this, &BBQHTTPClientApp::handleHelp)));
 
-	try {
-		HTTPResponse response;
-		std::istream& rs = session.receiveResponse(response);
+		options.addOption(
+			Option()
+			.fullName("server")
+			.description("BBQ Server to connect to")
+			.required(true)
+			.repeatable(false)
+			.argument("value")
+			.binding("Server"));
 
-		if (response.getStatus() == HTTPResponse::HTTP_OK)
+		options.addOption(
+			Option()
+			.fullName("port")
+			.description("BBQ Protocol port")
+			.required(false)
+			.repeatable(false)
+			.argument("value")
+			.binding("ServerPort"));
+
+		options.addOption(
+			Option()
+			.fullName("proxy")
+			.description("optional if you use proxy")
+			.required(false)
+			.repeatable(false)
+			.argument("value")
+			.binding("Proxy"));
+
+		options.addOption(
+			Option()
+			.fullName("proxy-port")
+			.description("proxy port")
+			.required(false)
+			.repeatable(false)
+			.argument("value")
+			.binding("ProxyPort"));
+	}
+
+	void handleHelp(const std::string& name, const std::string& value)
+	{
+		_helpRequested = true;
+		displayHelp();
+		stopOptionsProcessing();
+	}
+
+	void handleDefine(const std::string& name, const std::string& value)
+	{
+		defineProperty(value);
+	}
+
+	void handleConfig(const std::string& name, const std::string& value)
+	{
+		loadConfiguration(value);
+	}
+
+	void displayHelp()
+	{
+		HelpFormatter helpFormatter(options());
+		helpFormatter.setCommand(commandName());
+		helpFormatter.setUsage("OPTIONS");
+		helpFormatter.setHeader("BBQ Client over HTTP.");
+		helpFormatter.format(std::cout);
+	}
+
+	void defineProperty(const std::string& def)
+	{
+		std::string name;
+		std::string value;
+		std::string::size_type pos = def.find('=');
+		if (pos != std::string::npos)
 		{
-			vector<Poco::Net::HTTPCookie> newCookies;
-			response.getCookies(newCookies);
-			if (!newCookies.empty()) {
-				cookies = getCookies(newCookies);
+			name.assign(def, 0, pos);
+			value.assign(def, pos + 1, def.length() - pos);
+		}
+		else name = def;
+		config().setString(name, value);
+	}
+
+	int main(const std::vector<std::string>& args)
+	{
+		if (!_helpRequested)
+		{
+			int httpPort = 80;
+
+			if (config().hasProperty("ServerPort")) {
+				httpPort = stoi(config().getString("ServerPort"));
+			};
+
+			HTTPClientSession session(config().getString("Server"), httpPort);
+
+			logger().information("Connecting to " + session.getHost() + " on port " + to_string(session.getPort()));
+
+			if (config().hasProperty("Proxy"))
+			{
+				Poco::Net::HTTPClientSession::ProxyConfig proxy;
+
+				proxy.host = config().getString("Proxy");
+				proxy.port = stoi(config().getString("ProxyPort"));
+				proxy.authMethod = Poco::Net::HTTPClientSession::ProxyAuthentication::PROXY_AUTH_NONE;
+
+				session.setProxyConfig(proxy);
+
+				logger().information("Using proxy " + session.getProxyHost() + " on port " + to_string(session.getProxyPort()));
+			};
+
+			string command = BBQ::clientCmdToStr(BBQ::ClientCommand::I_AM_HUNGRY_GIVE_ME_BBQ);
+
+			try {
+
+				Poco::Net::NameValueCollection cookies;
+
+				BBQ::ServerResponse response = sendCommand(command, session, cookies);
+
+				while (response == BBQ::ServerResponse::OkWait) {
+					response = sendCommand(command, session, cookies);
+				}
+
+				if (response == BBQ::ServerResponse::BeefReady || response == BBQ::ServerResponse::ChickenReady)
+				{
+					command = BBQ::clientCmdToStr(BBQ::ClientCommand::I_TAKE_THAT);
+				}
+				else if (response == BBQ::ServerResponse::MammothReady)
+				{
+					command = BBQ::clientCmdToStr(BBQ::ClientCommand::NO_THANKS);
+				}
+
+				response = sendCommand(command, session, cookies);
 			}
+			catch (Poco::Exception& exc) {
+				logger().error("Error: " + exc.displayText());
+			}
+		}
 
-			string encoded_content(std::istreambuf_iterator<char>(rs), {});
+		return Application::EXIT_OK;
+	}
 
-			string result;
-			Poco::URI::decode(encoded_content, result);
-
-			cout << "Recieced: " << result << endl;
-
-			BBQ::ServerResponse resp = BBQ::strToSrvResp(result);
-
-			return resp;
+	void printProperties(const std::string& base)
+	{
+		AbstractConfiguration::Keys keys;
+		config().keys(base, keys);
+		if (keys.empty())
+		{
+			if (config().hasProperty(base))
+			{
+				std::string msg;
+				msg.append(base);
+				msg.append(" = ");
+				msg.append(config().getString(base));
+				logger().information(msg);
+			}
 		}
 		else
 		{
-			cout << "Error: " << response.getStatus() << endl;
-			return BBQ::ServerResponse::Closed;
+			for (AbstractConfiguration::Keys::const_iterator it = keys.begin(); it != keys.end(); ++it)
+			{
+				std::string fullKey = base;
+				if (!fullKey.empty()) fullKey += '.';
+				fullKey.append(*it);
+				printProperties(fullKey);
+			}
 		}
 	}
-	catch (Poco::Exception& exc) {
-		cout << exc.displayText();
-		return BBQ::ServerResponse::OkWait;
-	}
-}
 
-
-int main(int argc, char** argv)
-{
-	if (argc < 2) return EXIT_FAILURE;
-	bool useProxy = false;
-	if (argc == 4) { useProxy = true; }
-
-	URI uri(argv[1]);
-
-	std::string path(uri.getPathAndQuery());
-	if (path.empty()) path = "/";
-
-	HTTPClientSession session(uri.getHost(), uri.getPort());
-
-	if (useProxy)
-	{
-		Poco::Net::HTTPClientSession::ProxyConfig proxy;
-
-		proxy.host = argv[2];
-		proxy.port = stoi(argv[3]);
-		proxy.authMethod = Poco::Net::HTTPClientSession::ProxyAuthentication::PROXY_AUTH_NONE;
-
-		session.setProxyConfig(proxy);
-	};
-
-
-	string command = BBQ::clientCmdToStr(BBQ::ClientCommand::I_AM_HUNGRY_GIVE_ME_BBQ);
-
-	try {
-
-		Poco::Net::NameValueCollection cookies;
-		
-		BBQ::ServerResponse response = sendCommand(command, session, cookies);
-		
-		while (response == BBQ::ServerResponse::OkWait) {
-			response = sendCommand(command, session, cookies);
+	BBQ::ServerResponse sendCommand(string command, HTTPClientSession& session, Poco::Net::NameValueCollection& cookies) {
+		HTTPRequest request(HTTPRequest::HTTP_POST, "/", HTTPMessage::HTTP_1_1);
+	
+		request.setContentLength(command.length());
+	
+		request.setCookies(cookies);
+	
+		ostream& os = session.sendRequest(request);
+		os << command;
+	
+		logger().information("Sent: " + command);
+	
+		try {
+			HTTPResponse response;
+			std::istream& rs = session.receiveResponse(response);
+	
+			if (response.getStatus() == HTTPResponse::HTTP_OK)
+			{
+				vector<Poco::Net::HTTPCookie> newCookies;
+				response.getCookies(newCookies);
+				if (!newCookies.empty()) {
+					cookies = getCookies(newCookies);
+				}
+	
+				string encoded_content(std::istreambuf_iterator<char>(rs), {});
+	
+				string result;
+				Poco::URI::decode(encoded_content, result);
+	
+				logger().information("Recieced: " + result);
+	
+				BBQ::ServerResponse resp = BBQ::strToSrvResp(result);
+	
+				return resp;
+			}
+			else
+			{
+				logger().error("Error: " + response.getStatus());
+				return BBQ::ServerResponse::Closed;
+			}
 		}
-
-		if (response == BBQ::ServerResponse::BeefReady || response == BBQ::ServerResponse::ChickenReady)
-		{
-			command = BBQ::clientCmdToStr(BBQ::ClientCommand::I_TAKE_THAT);
+		catch (Poco::Exception& exc) {
+			logger().error("Error: " + exc.displayText());
+			return BBQ::ServerResponse::OkWait;
 		}
-		else if (response == BBQ::ServerResponse::MammothReady)
-		{
-			command = BBQ::clientCmdToStr(BBQ::ClientCommand::NO_THANKS);
-		}
-
-		response = sendCommand(command, session, cookies);
-	}
-	catch (Poco::Exception& exc) {
-		cout << "Error: " << exc.displayText();
 	}
 
-	cout << endl << "-- Press [Enter] to exit --" << endl;
-	cin.get();
-}
+	Poco::Net::NameValueCollection getCookies(vector<Poco::Net::HTTPCookie>& cookies) {
+		Poco::Net::NameValueCollection nvc;
+		std::vector<Poco::Net::HTTPCookie>::const_iterator it = cookies.begin();
+		while (it != cookies.end()) {
+			nvc.add((*it).getName(), (*it).getValue());
+			++it;
+		}
+		return nvc;
+	}
+
+private:
+	bool _helpRequested;
+};
 
 
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
+POCO_APP_MAIN(BBQHTTPClientApp)
