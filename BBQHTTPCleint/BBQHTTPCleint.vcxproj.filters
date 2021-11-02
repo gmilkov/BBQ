@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="BBQHTTPCleint.cpp">
+    <ClCompile Include="BBQHTTPCliеnt.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

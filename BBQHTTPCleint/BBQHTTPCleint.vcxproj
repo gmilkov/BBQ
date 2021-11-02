@@ -24,6 +24,7 @@
     <ProjectGuid>{4ca1c1bf-0601-4c59-904d-ac4d3a63ce07}</ProjectGuid>
     <RootNamespace>BBQHTTPCleint</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>BBQHTTPCliеnt</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -139,7 +140,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="BBQHTTPCleint.cpp" />
+    <ClCompile Include="BBQHTTPCliеnt.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BBQProtocol\BBQProtocol.vcxproj">
